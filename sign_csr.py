@@ -163,7 +163,6 @@ openssl dgst -sha256 -sign user.key -out {} {}
 """.format(
     reg_file_sig_name, reg_file_name,
     "\n".join("openssl dgst -sha256 -sign user.key -out {} {}".format(i['sig_name'], i['file_name']) for i in ids),
-
     "\n".join("openssl dgst -sha256 -sign user.key -out {} {}".format(i['sig_name'], i['file_name']) for i in tests)))
 
     stdout = sys.stdout
@@ -250,7 +249,7 @@ sudo python -c "import BaseHTTPServer; \\
         stdout = sys.stdout
         sys.stdout = sys.stderr
 
-        if raw_input('Now I will attempt to start above described HTTP server. Continue?')!='y':
+        if raw_input('Now I will attempt to start above described HTTP server.\nContinue?')!='y':
             exit()
         def httpd(token):
             exec("import BaseHTTPServer;h=BaseHTTPServer.BaseHTTPRequestHandler;h.do_GET=lambda r,t=token: r.send_response(200) or r.end_headers() or r.wfile.write(t);s=BaseHTTPServer.HTTPServer(('0.0.0.0',80),h);s.handle_request()")
@@ -260,7 +259,7 @@ sudo python -c "import BaseHTTPServer; \\
         sys.stdout = stdout
 
         #Step 8: Let the CA know you're ready for the challenge
-        sys.stderr.write("Requesting verification for {}...\n".format(i['domain']))
+        sys.stderr.write("\nRequesting verification for {}...\n".format(i['domain']))
         test_data = json.dumps({
             "header": header,
             "protected": tests[n]['nonce64'],
@@ -341,7 +340,6 @@ openssl dgst -sha256 -sign user.key -out {} {}
 
     #Step 12: Convert the signed cert from DER to PEM
     sys.stderr.write("Certificate signed!\n")
-    sys.stderr.write("You can stop running the python command on your server (Ctrl+C works).\n")
     signed_der64 = base64.b64encode(signed_der)
     signed_pem = """\
 -----BEGIN CERTIFICATE-----

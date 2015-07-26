@@ -1,4 +1,4 @@
-#Let's Encrypt Without Sudo with Sudo
+#Let's Encrypt Without Sudo With Sudo
 
 This is a step back and fork of great program [Let's Encrypt Without Sudo](https://github.com/diafygi/letsencrypt-nosudo/)
 written by diafygi based on [Let's Encrypt](https://letsencrypt.org/). 
