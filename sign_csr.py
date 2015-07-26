@@ -1,5 +1,6 @@
 import argparse, subprocess, json, os, urllib2, sys, base64, binascii, ssl, \
     hashlib, tempfile, re, time, copy, textwrap
+from threading import Thread
 
 def sign_csr(pubkey, csr):
     """Use the ACME protocol to get an ssl certificate signed by a
@@ -72,7 +73,7 @@ def sign_csr(pubkey, csr):
     reg_email = "webmaster@{}".format(min(domains, key=len))
     reg_raw = json.dumps({
         "contact": ["mailto:{}".format(reg_email)],
-        "agreement": "https://www.letsencrypt-demo.org/terms",
+        "agreement": "https://letsencrypt.org/documents/LE-SA-v1.0-June-23-2015.pdf",
         #"agreement": "https://letsencrypt.org/be-good",
     }, sort_keys=True, indent=4)
     reg_b64 = _b64(reg_raw)
@@ -162,11 +163,18 @@ openssl dgst -sha256 -sign user.key -out {} {}
 """.format(
     reg_file_sig_name, reg_file_name,
     "\n".join("openssl dgst -sha256 -sign user.key -out {} {}".format(i['sig_name'], i['file_name']) for i in ids),
+
     "\n".join("openssl dgst -sha256 -sign user.key -out {} {}".format(i['sig_name'], i['file_name']) for i in tests)))
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
-    raw_input("Press Enter when you've run the above commands in a new terminal window...")
+
+    toSign=(ids+tests)
+    toSign.append({'sig_name':reg_file_sig_name,'file_name':reg_file_name})
+    print 'Signing',len(toSign),'files.\n'
+    for i in toSign:
+        subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
+
     sys.stdout = stdout
 
     #Step 4: Load the signatures
@@ -241,7 +249,14 @@ sudo python -c "import BaseHTTPServer; \\
 
         stdout = sys.stdout
         sys.stdout = sys.stderr
-        raw_input("Press Enter when you've got the python command running on your server...")
+
+        if raw_input('Now I will attempt to start above described HTTP server. Continue?')!='y':
+            exit()
+        def httpd(token):
+            exec("import BaseHTTPServer;h=BaseHTTPServer.BaseHTTPRequestHandler;h.do_GET=lambda r,t=token: r.send_response(200) or r.end_headers() or r.wfile.write(t);s=BaseHTTPServer.HTTPServer(('0.0.0.0',80),h);s.handle_request()")
+        t=Thread(target=httpd,args=(token,))
+        t.start()
+
         sys.stdout = stdout
 
         #Step 8: Let the CA know you're ready for the challenge
@@ -297,7 +312,10 @@ openssl dgst -sha256 -sign user.key -out {} {}
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
-    raw_input("Press Enter when you've run the above command in a new terminal window...")
+
+    print 'Signing final file.\n'
+    subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',csr_file_sig_name,csr_file_name],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
+
     sys.stdout = stdout
 
     #Step 11: Get the certificate signed
