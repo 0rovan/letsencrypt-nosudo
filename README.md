@@ -1,3 +1,22 @@
+#Let's Encrypt Without Sudo with Sudo
+
+This is a step back and fork of great program [Let's Encrypt Without Sudo](https://github.com/diafygi/letsencrypt-nosudo/)
+written by diafygi based on [Let's Encrypt](https://letsencrypt.org/). 
+
+His idea was getting signed certificate without allowing program to run under
+root permission. This is not the same reason why I prefer to use non-sudo
+version over the original. I do not mind program to be run as root, but I do
+not wish my server configuration to be changed. I would only like free TSL
+certificate please...
+
+Since I do not mind the program to be run as root, I can modify it to make it
+faster and even easier to obtain the signed certificate then diafygi's version.
+
+diafygi has done a great job on documentation of his program and since I have done
+only tiny modifications I can leave his original manual unchanged below. Just keep
+in mind not all step will be necessary as you follow them.
+
+
 #Let's Encrypt Without Sudo
 
 **WARNING: THE LET'S ENCRYPT CERTIFICATE AUTHORITY IS NOT YET READY! ANY
