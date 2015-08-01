@@ -1,8 +1,9 @@
 import argparse, subprocess, json, os, urllib2, sys, base64, binascii, ssl, \
     hashlib, tempfile, re, time, copy, textwrap
 from threading import Thread
+from BaseHTTPServer import HTTPServer,BaseHTTPRequestHandler
 
-def sign_csr(pubkey, csr):
+def sign_csr(pubkey, csr, automatized):
     """Use the ACME protocol to get an ssl certificate signed by a
     certificate authority.
 
@@ -74,6 +75,7 @@ def sign_csr(pubkey, csr):
     reg_raw = json.dumps({
         "contact": ["mailto:{}".format(reg_email)],
         "agreement": "https://letsencrypt.org/documents/LE-SA-v1.0-June-23-2015.pdf",
+        #"agreement": "https://www.letsencrypt-demo.org/terms",
         #"agreement": "https://letsencrypt.org/be-good",
     }, sort_keys=True, indent=4)
     reg_b64 = _b64(reg_raw)
@@ -167,13 +169,14 @@ openssl dgst -sha256 -sign user.key -out {} {}
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
-
-    toSign=(ids+tests)
-    toSign.append({'sig_name':reg_file_sig_name,'file_name':reg_file_name})
-    print 'Signing',len(toSign),'files.\n'
-    for i in toSign:
-        subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
-
+    if automatized:
+        toSign=(ids+tests)
+        toSign.append({'sig_name':reg_file_sig_name,'file_name':reg_file_name})
+        print 'Signing',len(toSign),'files.\n'
+        for i in toSign:
+            subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
+    else:
+        raw_input("Press Enter when you've run the above commands in a new terminal window...")
     sys.stdout = stdout
 
     #Step 4: Load the signatures
@@ -248,14 +251,17 @@ sudo python -c "import BaseHTTPServer; \\
 
         stdout = sys.stdout
         sys.stdout = sys.stderr
-
-        if raw_input('Now I will attempt to start above described HTTP server.\nContinue?')!='y':
-            exit()
-        def httpd(token):
-            exec("import BaseHTTPServer;h=BaseHTTPServer.BaseHTTPRequestHandler;h.do_GET=lambda r,t=token: r.send_response(200) or r.end_headers() or r.wfile.write(t);s=BaseHTTPServer.HTTPServer(('0.0.0.0',80),h);s.handle_request()")
-        t=Thread(target=httpd,args=(token,))
-        t.start()
-
+        if automatized:
+            print 'starting web server on port 80'
+            def httpd(token):
+                h=BaseHTTPRequestHandler
+                h.do_GET=lambda r,t=token: r.send_response(200) or r.end_headers() or r.wfile.write(t);
+                s=HTTPServer(('0.0.0.0',80),h);
+                s.handle_request()
+            t=Thread(target=httpd,args=(token,))
+            t.start()
+        else:
+            raw_input("Press Enter when you've got the python command running on your server...")
         sys.stdout = stdout
 
         #Step 8: Let the CA know you're ready for the challenge
@@ -311,10 +317,11 @@ openssl dgst -sha256 -sign user.key -out {} {}
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
-
-    print 'Signing final file.\n'
-    subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',csr_file_sig_name,csr_file_name],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
-
+    if automatized:
+        print 'Signing final file.\n'
+        subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',csr_file_sig_name,csr_file_name],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
+    else:
+        raw_input("Press Enter when you've run the above command in a new terminal window...")
     sys.stdout = stdout
 
     #Step 11: Get the certificate signed
@@ -359,6 +366,9 @@ server and this script does not ask for your private keys. It will print out
 commands that you need to run with your private key or on your server as root,
 which gives you a chance to review the commands instead of trusting this script.
 
+Optionally you can decide to trust this script and run it on your server as root
+and use --trust switch. This allows you to have certificate signed in singe command.
+
 NOTE: YOUR ACCOUNT KEY NEEDS TO BE DIFFERENT FROM YOUR DOMAIN KEY.
 
 Prerequisites:
@@ -375,10 +385,21 @@ $ python sign_csr.py user.pub domain.csr > signed.crt
 --------------
 
 """)
-    parser.add_argument("pubkey_path", help="path to your account public key")
-    parser.add_argument("csr_path", help="path to your certificate signing request")
+    parser.add_argument('--trust',action='store_true',default=False,help='complete chalanges automaticaly')
+    parser.add_argument('-w',dest='crt_path',action='store',help='write output to file')
+    parser.add_argument("pubkey_path", action="store", help="path to your account public key")
+    parser.add_argument("csr_path", action="store", help="path to your certificate signing request")
 
     args = parser.parse_args()
-    signed_crt = sign_csr(args.pubkey_path, args.csr_path)
-    sys.stdout.write(signed_crt)
+    if args.trust and os.geteuid()!=0:
+        print 'Run as root or without --trust switch'
+        exit()
+    signed_crt = sign_csr(args.pubkey_path, args.csr_path, args.trust)
+    if args.crt_path:
+        print 'saving signed certificate in',args.crt_path
+        crtFile=open(args.crt_path,'w')
+        crtFile.write(signed_crt)
+        crtFile.close()
+    else:
+        sys.stdout.write(signed_crt)
 
