@@ -1,22 +1,3 @@
-#Let's Encrypt Without Sudo With Sudo
-
-This is a step back and fork of great program [Let's Encrypt Without Sudo](https://github.com/diafygi/letsencrypt-nosudo/)
-written by diafygi based on [Let's Encrypt](https://letsencrypt.org/). 
-
-His idea was getting signed certificate without allowing program to run under
-root permission. This is not the same reason why I prefer to use non-sudo
-version over the original. I do not mind program to be run as root, but I do
-not wish my server configuration to be changed. I would only like free TSL
-certificate please...
-
-Since I do not mind the program to be run as root, I can modify it to make it
-faster and even easier to obtain the signed certificate then diafygi's version.
-
-diafygi has done a great job on documentation of his program and since I have done
-only tiny modifications I can leave his original manual unchanged below. Just keep
-in mind not all step will be necessary as you follow them.
-
-
 #Let's Encrypt Without Sudo
 
 **WARNING: THE LET'S ENCRYPT CERTIFICATE AUTHORITY IS NOT YET READY! ANY
@@ -44,6 +25,10 @@ private key and access to your server. For those parts, this script prints out
 very minimal commands for you to run to complete the requirements. There is only
 one command that needs to be run as root on your server and it is a very simple
 python https server that you can inspect for yourself before you run it.
+
+If you wish run this script as a root on server in need of certificate and you
+trust this script, you can use --trust switch. This will complete challenges in
+background and you obtain your certificate by one line command.
 
 ##Table of Contents
 
@@ -129,6 +114,9 @@ server and this script does not ask for your private keys. It will print out
 commands that you need to run with your private key or on your server as root,
 which gives you a chance to review the commands instead of trusting this script.
 
+Optionally you can decide to trust this script and run it on your server as root
+and use --trust switch. This allows you to have certificate signed in singe command.
+
 NOTE: YOUR ACCOUNT KEY NEEDS TO BE DIFFERENT FROM YOUR DOMAIN KEY.
 
 Prerequisites:
@@ -150,6 +138,8 @@ positional arguments:
 
 optional arguments:
   -h, --help   show this help message and exit
+  --trust      complete chalanges automaticaly
+  -w CRT_PATH  write output to file
 user@hostname:~$
 ```
 
