@@ -76,8 +76,11 @@ def sign_csr(pubkey, csr, email=None, automatized=False):
         default_email = "webmaster@{}".format(min(domains, key=len))
         stdout = sys.stdout
         sys.stdout = sys.stderr
-        input_email = raw_input("STEP 1: What is your contact email? ({}) ".format(default_email))
-        email = input_email if input_email else default_email
+        if automatized:
+            email=default_email
+        else:
+            input_email = raw_input("STEP 1: What is your contact email? ({}) ".format(default_email))
+            email = input_email if input_email else default_email
         sys.stdout = stdout
 
     # Step 4: Generate the payloads that need to be signed
@@ -198,6 +201,7 @@ openssl dgst -sha256 -sign user.key -out {} {}
     if automatized:
         toSign=(ids+tests)
         toSign.append({'sig_name':reg_file_sig_name,'file_name':reg_file_name})
+        toSign.append({'sig_name':csr_file_sig_name,'file_name':csr_file_name})
         print 'Signing',len(toSign),'files.\n'
         for i in toSign:
             subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
@@ -296,7 +300,13 @@ STEP 3: You need to sign some more files (replace 'user.key' with your user priv
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
-    raw_input("Press Enter when you've run the above commands in a new terminal window...")
+    if automatized:
+        print 'Signing',len(responses),'files.\n'
+        for i in responses:
+            subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
+    else:
+        raw_input("Press Enter when you've run the above commands in a new terminal window...")
+
     sys.stdout = stdout
 
     # Step 10: Load the response signatures
@@ -329,10 +339,10 @@ sudo python -c "import BaseHTTPServer; \\
             print 'starting web server on port 80'
             def httpd(token):
                 h=BaseHTTPRequestHandler
-                h.do_GET=lambda r,t=token: r.send_response(200) or r.end_headers() or r.wfile.write(t);
+                h.do_GET=lambda r: r.send_response(200) or r.end_headers() or r.wfile.write(token);
                 s=HTTPServer(('0.0.0.0',80),h);
                 s.handle_request()
-            t=Thread(target=httpd,args=(token,))
+            t=Thread(target=httpd,args=(response_payload.replace('\\"','"'),))
             t.start()
         else:
             raw_input("Press Enter when you've got the python command running on your server...")
@@ -449,7 +459,7 @@ $ python sign_csr.py --public-key user.pub domain.csr > signed.crt
     if args.trust and os.geteuid()!=0:
         print 'Run as root or without --trust switch'
         exit()
-    signed_crt = sign_csr(args.pubkey_path, args.csr_path, email=args.email, automatized=args.trust)
+    signed_crt = sign_csr(args.public_key, args.csr_path, email=args.email, automatized=args.trust)
     if args.crt_path:
         print 'saving signed certificate in',args.crt_path
         crtFile=open(args.crt_path,'w')
@@ -457,4 +467,5 @@ $ python sign_csr.py --public-key user.pub domain.csr > signed.crt
         crtFile.close()
     else:
         sys.stdout.write(signed_crt)
+
 
