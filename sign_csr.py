@@ -4,7 +4,7 @@ import argparse, subprocess, json, os, urllib2, sys, base64, binascii, ssl, \
 from threading import Thread
 from BaseHTTPServer import HTTPServer,BaseHTTPRequestHandler
 
-def sign_csr(pubkey, csr, email=None, automatized=False):
+def sign_csr(pubkey, csr, privkey, email=None, automatized=False):
     """Use the ACME protocol to get an ssl certificate signed by a
     certificate authority.
 
@@ -182,19 +182,21 @@ def sign_csr(pubkey, csr, email=None, automatized=False):
     csr_file_sig_name = os.path.basename(csr_file_sig.name)
 
     # Step 5: Ask the user to sign the registration and requests
+    privkey_path='user.key' if privkey==None else privkey # privkey can be None only if atomatized==True
     sys.stderr.write("""\
-STEP 2: You need to sign some files (replace 'user.key' with your user private key).
+STEP 2: You need to sign some files{}.
 
-openssl dgst -sha256 -sign user.key -out {} {}
+openssl dgst -sha256 -sign {} -out {} {}
 {}
 {}
-openssl dgst -sha256 -sign user.key -out {} {}
+openssl dgst -sha256 -sign {} -out {} {}
 
 """.format(
-    reg_file_sig_name, reg_file_name,
-    "\n".join("openssl dgst -sha256 -sign user.key -out {} {}".format(i['sig_name'], i['file_name']) for i in ids),
-    "\n".join("openssl dgst -sha256 -sign user.key -out {} {}".format(i['sig_name'], i['file_name']) for i in tests),
-    csr_file_sig_name, csr_file_name))
+    ' (replace \'user.key\' with your user private key).' if not privkey else '',\
+    privkey_path,reg_file_sig_name, reg_file_name,
+    "\n".join("openssl dgst -sha256 -sign {} -out {} {}".format(privkey_path,i['sig_name'], i['file_name']) for i in ids),
+    "\n".join("openssl dgst -sha256 -sign {} -out {} {}".format(privkey_path,i['sig_name'], i['file_name']) for i in tests),
+    privkey_path,csr_file_sig_name, csr_file_name))
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
@@ -204,7 +206,7 @@ openssl dgst -sha256 -sign user.key -out {} {}
         toSign.append({'sig_name':csr_file_sig_name,'file_name':csr_file_name})
         print 'Signing',len(toSign),'files.\n'
         for i in toSign:
-            subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
+            subprocess.Popen(['openssl','dgst','-sha256','-sign',privkey_path,'-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
     else:
         raw_input("Press Enter when you've run the above commands in a new terminal window...")
     sys.stdout = stdout
@@ -290,20 +292,21 @@ openssl dgst -sha256 -sign user.key -out {} {}
 
     # Step 9: Ask the user to sign the challenge responses
     sys.stderr.write("""\
-STEP 3: You need to sign some more files (replace 'user.key' with your user private key).
+STEP 3: You need to sign some more files{}.
 
 {}
 
 """.format(
-    "\n".join("openssl dgst -sha256 -sign user.key -out {} {}".format(
-        i['sig_name'], i['file_name']) for i in responses)))
+    ' (replace \'user.key\' with your user private key).' if not privkey else '',\
+    "\n".join("openssl dgst -sha256 -sign {} -out {} {}".format(
+        privkey_path,i['sig_name'], i['file_name']) for i in responses)))
 
     stdout = sys.stdout
     sys.stdout = sys.stderr
     if automatized:
         print 'Signing',len(responses),'files.\n'
         for i in responses:
-            subprocess.Popen(['openssl','dgst','-sha256','-sign','user.key','-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
+            subprocess.Popen(['openssl','dgst','-sha256','-sign',privkey_path,'-out',i['sig_name'],i['file_name']],stdout=subprocess.PIPE,stderr=subprocess.PIPE).communicate()
     else:
         raw_input("Press Enter when you've run the above commands in a new terminal window...")
 
@@ -452,14 +455,19 @@ $ python sign_csr.py --public-key user.pub domain.csr > signed.crt
     parser.add_argument('--trust',action='store_true',default=False,help='complete chalanges automaticaly')
     parser.add_argument('-w',dest='crt_path',action='store',help='write output to file')
     parser.add_argument("-p","--public-key",action="store",required=True,help="path to your account public key")
+    parser.add_argument("-k","--private-key",action="store",default=None,help='path to your account private key')
     parser.add_argument("-e","--email",action="store",default=None, help="contact email, default is webmaster@<shortest_domain>")
     parser.add_argument("csr_path", action="store",help="path to your certificate signing request")
 
     args = parser.parse_args()
-    if args.trust and os.geteuid()!=0:
-        print 'Run as root or without --trust switch'
-        exit()
-    signed_crt = sign_csr(args.public_key, args.csr_path, email=args.email, automatized=args.trust)
+    if args.trust:
+        if args.private_key==None:
+            print 'Define path to account private key with -k or --private-key. This is needed to sign challenges automaticaly. You also to sign them manualy if you run program without --trust swith.'
+            exit()
+        if os.geteuid()!=0:
+            print 'Run as root or without --trust switch'
+            exit()
+    signed_crt = sign_csr(args.public_key, args.csr_path, args.private_key, email=args.email, automatized=args.trust)
     if args.crt_path:
         print 'saving signed certificate in',args.crt_path
         crtFile=open(args.crt_path,'w')
